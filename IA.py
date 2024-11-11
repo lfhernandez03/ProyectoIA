@@ -78,11 +78,17 @@ mapa3 = [
 mapas = [mapa1, mapa2, mapa3]
 laberinto = mapas[0]  # Inicializa el laberinto con el primer mapa
 en_seleccion_mapa = False  # Agrega esta línea para inicializar la variable
+mapa_actual = 0  # Inicializa el mapa actual
 
 def obtener_posicion(laberinto):
-    posiciones = {}
-    for fila in range(FILAS):
-        for columna in range(COLUMNAS):
+    posiciones = {
+        'rene': None,
+        'elmo': None,
+        'piggy': None,
+        'galleta': None
+    }
+    for fila in range(len(laberinto)):
+        for columna in range(len(laberinto[fila])):
             if laberinto[fila][columna] == 'R':
                 posiciones['rene'] = (fila, columna)
             elif laberinto[fila][columna] == 'E':
@@ -93,12 +99,9 @@ def obtener_posicion(laberinto):
                 posiciones['galleta'] = (fila, columna)
     return posiciones
 
-       
+# Inicializar las posiciones
 posiciones = obtener_posicion(laberinto)
-posicion_rene = posiciones['rene']
-posicion_elmo = posiciones['elmo']
-posicion_piggy = posiciones['piggy']
-posicion_galleta = posiciones['galleta']
+
 
 # Movimientos posibles: arriba, abajo, izquierda, derecha
 movimientos = [(-1, 0), (1, 0), (0, -1), (0, 1)]
@@ -202,6 +205,7 @@ def bfs_piggy(laberinto, posicion_piggy, posicion_rene):
 
         # Verifica si Piggy ha encontrado a René
         if posicion_actual == posicion_rene:
+            
             return camino_actual  # Retorna el camino encontrado
 
         # Define los movimientos posibles (arriba, abajo, izquierda, derecha)
@@ -237,8 +241,9 @@ def podar_arbol(arbol, camino_valido):
 # Función para mover los personajes 
 comio_galleta = False
 encontro_piggy = False
+
 def mover_personaje(laberinto, camino, personaje):
-    global comio_galleta, encontro_piggy, posicion_rene, posicion_piggy, posicion_elmo
+    global comio_galleta, encontro_piggy, posicion_rene, posicion_piggy, posicion_elmo, en_seleccion_mapa
 
     for paso in camino:
         # Comprobar que el paso sea una tupla de longitud 2
@@ -265,27 +270,6 @@ def mover_personaje(laberinto, camino, personaje):
         elif personaje == 'P':
             posicion_piggy = (fila, columna)
 
-        # Verificar interacciones específicas de René
-        if personaje == 'R':
-            # Verificar si René encontró la galleta
-            if (fila, columna) == tuple(posicion_galleta):
-                comio_galleta = True
-
-            # Verificar si René encontró a Piggy
-            if (fila, columna) == posicion_piggy:
-                encontro_piggy = True
-                ventana.blit(imagen_rana_elmo, (columna * TAMANO_CELDA, fila * TAMANO_CELDA))
-                pygame.display.flip()
-                pygame.time.delay(500)
-                break
-
-            # Verificar si René encontró a Elmo
-            if (fila, columna) == posicion_elmo:
-                ventana.blit(imagen_rana_elmo, (columna * TAMANO_CELDA, fila * TAMANO_CELDA))
-                pygame.display.flip()
-                pygame.time.delay(500)
-                break
-
         # Dibujar el estado actual del laberinto
         dibujar_laberinto(ventana, laberinto)
 
@@ -298,69 +282,69 @@ def mover_personaje(laberinto, camino, personaje):
         elif personaje == 'P':
             ventana.blit(imagen_piggy, (columna * TAMANO_CELDA, fila * TAMANO_CELDA))
 
-        # Redibujar otros elementos del laberinto
-        if comio_galleta:
-            ventana.blit(imagen_galleta, (posicion_galleta[1] * TAMANO_CELDA, posicion_galleta[0] * TAMANO_CELDA))
-        ventana.blit(imagen_piggy, (posicion_piggy[1] * TAMANO_CELDA, posicion_piggy[0] * TAMANO_CELDA))
-
         pygame.display.flip()
         pygame.time.delay(500)
 
-    # Restablecer si René comió la galleta
-    if personaje == 'R' and comio_galleta:
-        comio_galleta = False
-        dibujar_laberinto(ventana, laberinto)
-        ventana.blit(imagen_rene, (columna * TAMANO_CELDA, fila * TAMANO_CELDA))
-        pygame.display.flip()
+        # Verificar interacciones específicas de René
+        if personaje == 'R':
+            # Verificar si René encontró la galleta
+            if (fila, columna) == tuple(posicion_galleta):
+                comio_galleta = True
+                ventana.blit(imagen_rana_galleta, (columna * TAMANO_CELDA, fila * TAMANO_CELDA))
+                pygame.display.flip()
+                pygame.time.delay(500)
+                comio_galleta = False  # Restablecer la variable después de mostrar la imagen
 
-    # Mostrar mensaje de interacción con Piggy si corresponde
-    if personaje == 'R' and encontro_piggy:
-        mostrar_mensaje_interaccion_piggy()
-        encontro_piggy = False  # Reiniciar la variable después de mostrar el mensaje
+            # Verificar si René encontró a Piggy
+            if (fila, columna) == posicion_piggy:
+                encontro_piggy = True
+                ventana.blit(imagen_rana_elmo, (columna * TAMANO_CELDA, fila * TAMANO_CELDA))
+                pygame.display.flip()
+                mostrar_mensaje_interaccion_piggy()
+                en_seleccion_mapa = True  # Permitir selección de mapa tras interacción con Piggy
+                break
 
+        # Redibujar la imagen original si le queda camino
+        if personaje == 'R' and not comio_galleta:
+            dibujar_laberinto(ventana, laberinto)
+            ventana.blit(imagen_rene, (columna * TAMANO_CELDA, fila * TAMANO_CELDA))
+            pygame.display.flip()
 
 # Función para mostrar mensaje de interacción con Piggy
 def mostrar_mensaje_interaccion_piggy():
+    global en_seleccion_mapa
     fuente = pygame.font.Font(FONT, 20)
     ventana.fill(BLANCO)
-    mensaje = fuente.render("¡René encontró a Piggy!", True, AMARILLO)
-    ventana.blit(mensaje, (50, 50))
+    mensaje = fuente.render("Piggy atrapo a Rene! Fin del juego.", True, VERDE)
+    ventana.blit(mensaje, (100, 100))
     pygame.display.flip()
     pygame.time.delay(2000)  # Mostrar el mensaje por 2 segundos
+    en_seleccion_mapa = True  # Permitir selección de mapa tras interacción con Piggy
 
 # Función para mostrar mensaje de éxito
 def mostrar_mensaje_exito():
-    fuente = pygame.font.Font(FONT, 20)
+    global en_seleccion_mapa
+    fuente = pygame.font.Font(None, 36)
     ventana.fill(BLANCO)
-    mensaje = fuente.render("¡René encontró a Elmo!", True, VERDE)
-    ventana.blit(mensaje, (50, 50))
-    boton_rect = pygame.Rect(150, 200, 300, 100)
-    pygame.draw.rect(ventana, AZUL, boton_rect)
-    boton_texto = fuente.render("Volver a jugar", True, BLANCO)
-    ventana.blit(boton_texto, (200, 230))
+    mensaje = fuente.render("¡Rene encontro la galleta!", True, VERDE)
+    ventana.blit(mensaje, (100, 100))
     pygame.display.flip()
-    
-    esperando_click = True
-    while esperando_click:
-        for evento in pygame.event.get():
-            if evento.type == pygame.QUIT:
-                pygame.quit()
-                exit()
-            if evento.type == pygame.MOUSEBUTTONDOWN:
-                if boton_rect.collidepoint(evento.pos):
-                    esperando_click = False
+    pygame.time.delay(2000)
+    en_seleccion_mapa = True  # Permitir selección de mapa tras éxito
 
 # Función para reiniciar posiciones
-def reiniciar_posiciones():
-    obtener_posicion(laberinto)
-    ventana.blit(imagen_piggy, (posicion_piggy[1] * TAMANO_CELDA, posicion_piggy[0] * TAMANO_CELDA))
-    ventana.blit(imagen_galleta, (posicion_galleta[1] * TAMANO_CELDA, posicion_galleta[0] * TAMANO_CELDA))
-    ventana.blit(imagen_rana_elmo, (posicion_elmo[1] * TAMANO_CELDA, posicion_elmo[0] * TAMANO_CELDA)) 
-    pygame.display.flip()
-
+def reiniciar_laberinto():
+    global laberinto, posiciones, posicion_rene, posicion_piggy, posicion_elmo, posicion_galleta
+    laberinto = [fila[:] for fila in mapas[mapa_actual]]  # Copia del mapa seleccionado
+    posiciones = obtener_posicion(laberinto)  # Actualiza las posiciones de personajes y objetos
+    posicion_rene = posiciones["rene"]
+    posicion_piggy = posiciones["piggy"]
+    posicion_elmo = posiciones["elmo"]
+    posicion_galleta = posiciones["galleta"]
+    
 # Función principal del juego
-def jugar(laberinto, camino_rene, camino_piggy, posicion_rene, posicion_piggy):
-    global encontro_piggy  # Variable global para determinar si Piggy encontró a René
+def jugar(laberinto, camino_rene, camino_piggy, posicion_rene, posicion_piggy, posicion_elmo):
+    encontro_piggy = False  # Variable local para determinar si Piggy encontró a René
 
     # Inicializar índices para iterar por los caminos
     indice_rene = 0
@@ -374,38 +358,47 @@ def jugar(laberinto, camino_rene, camino_piggy, posicion_rene, posicion_piggy):
             posicion_rene = camino_rene[indice_rene]  # Actualiza la posición de René
             mover_personaje(laberinto, [posicion_rene], 'R')
             indice_rene += 1
-            
-            # Verificar si René encontró a Piggy o a Elmo para finalizar el juego
-            if encontro_piggy or posicion_rene == posicion_elmo:
-                print("René ha terminado el juego.")
-                break
 
         # Mover a Piggy si aún tiene pasos en su camino
         if indice_piggy < len(camino_piggy):
             posicion_piggy = camino_piggy[indice_piggy]  # Actualiza la posición de Piggy
             mover_personaje(laberinto, [posicion_piggy], 'P')
             indice_piggy += 1
-            
-            # Verificar si Piggy encontró a René
-            if posicion_piggy == posicion_rene:
-                print("¡Piggy ha atrapado a René!")
-                break
+
+        # Verificar si Piggy encontró a René
+        if posicion_piggy == posicion_rene:
+            encontro_piggy = True  # Actualizar la variable local
+            break
+
+        # Verificar si René encontró a Piggy o a Elmo para finalizar el juego
+        if posicion_rene == posicion_elmo or encontro_piggy:
+            break
 
         # Actualiza el camino de Piggy después de cada movimiento
-        camino_piggy = actualizar_camino_piggy(laberinto, posicion_piggy, posicion_rene)
+        if indice_piggy < len(camino_piggy):
+            camino_piggy = actualizar_camino_piggy(laberinto, posicion_piggy, posicion_rene)
 
     # Mostrar mensaje de fin del juego
     if posicion_rene == posicion_elmo:
+        mostrar_mensaje_exito()
         print("¡René ha encontrado a Elmo y ganó el juego!")
-    elif posicion_piggy == posicion_rene:
+    elif encontro_piggy:
+        mostrar_mensaje_interaccion_piggy()
         print("¡Piggy ha alcanzado a René, el juego ha terminado!")
-
 
 # Interfaz gráfica
 boton_jugar = Button(200, 100, "Jugar")
 boton_nosotros = Button(200, 175, "Creditos")
 boton_salir = Button(200, 250, "Salir")
 boton_volver = Button(200, 500, "Volver")
+
+def crear_botones_mapa():
+    botones = []
+    for i in range(len(mapas)):
+        boton = Button(200, 100 + i * 75, f"Mapa {i + 1}")
+        boton.update()
+        botones.append(boton)
+    return botones
 
 # Variable para controlar el estado del juego
 en_menu = True
@@ -454,21 +447,12 @@ def nosotros():
     
 # Función para manejar eventos
 def manejar_eventos(events):
-    global en_menu
-    global en_nosotros
-    global en_seleccion_mapa
-    global laberinto
-    global posiciones
-    global posicion_rene
-    global posicion_piggy
-    global posicion_elmo
-    global posicion_galleta
-
+    global en_menu, en_nosotros, en_seleccion_mapa, laberinto
+    global posiciones, posicion_rene, posicion_piggy, posicion_elmo, posicion_galleta, mapa_actual
     for e in events:
         if e.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
-
         if en_menu:
             if boton_jugar.clicked:
                 en_menu = False
@@ -479,42 +463,34 @@ def manejar_eventos(events):
             if boton_salir.clicked:
                 pygame.quit()
                 sys.exit()
-
         elif en_seleccion_mapa:
-            # Aquí verifica cada botón de mapa
-            for i in range(len(mapas)):
-                boton_mapa = Button(200, 100 + i * 75, f"Mapa {i + 1}")
-                boton_mapa.update()  # Actualiza el estado del botón
+            # Verifica cada botón de mapa
+            botones_mapa = crear_botones_mapa()
+            for i, boton_mapa in enumerate(botones_mapa):
+                boton_mapa.update()
                 if boton_mapa.clicked:
-                    laberinto = mapas[i]  # Selecciona el mapa
-                    posiciones = obtener_posicion(laberinto)
-                    posicion_rene = posiciones['rene']
-                    posicion_elmo = posiciones['elmo']
-                    posicion_piggy = posiciones['piggy']
-                    posicion_galleta = posiciones['galleta']
+                    # Actualiza el mapa actual y reinicia el laberinto
+                    mapa_actual = i
+                    reiniciar_laberinto()
+                    en_seleccion_mapa = False
+                    en_menu = False
                     profundidad_maxima = 20
-
                     # Calcula los caminos para René y Piggy
                     camino_rene = busqueda_profundidad_limitada(laberinto, posicion_rene, posicion_elmo, profundidad_maxima)
                     camino_piggy = bfs_piggy(laberinto, posicion_piggy, posicion_rene)
-
-                    # Llama a jugar pasando el camino y las posiciones actuales de René y Piggy
-                    jugar(laberinto, camino_rene, camino_piggy, posicion_rene, posicion_piggy)  # Inicia el juego con los parámetros correctos
-
-            # Botón de volver al menú
+                    # Llama a jugar con los parámetros correctos
+                    jugar(laberinto, camino_rene, camino_piggy, posicion_rene, posicion_piggy, posicion_elmo)
+            # Crear y actualizar el botón de "Volver al menú"
             boton_volver_menu = Button(200, 100 + len(mapas) * 75, "Volver al menú")
-            boton_volver_menu.update()  # Asegúrate de que se actualice
+            boton_volver_menu.update()
             if boton_volver_menu.clicked:
                 en_seleccion_mapa = False
                 en_menu = True  # Regresar al menú principal
-
         elif en_nosotros:
             if boton_volver.clicked:
                 en_nosotros = False
                 en_menu = True  # Regresar al menú principal
-
-
-
+                
 # Función para mostrar la selección de mapa
 def mostrar_seleccion_mapa():
     ventana.fill(BLANCO)
@@ -525,8 +501,8 @@ def mostrar_seleccion_mapa():
     ventana.blit(titulo, (150, 50))
 
     # Dibujar botones para cada mapa
-    for i, mapa in enumerate(mapas):
-        boton_mapa = Button(200, 100 + i * 75, f"Mapa {i + 1}")
+    botones_mapa = crear_botones_mapa()
+    for boton_mapa in botones_mapa:
         boton_mapa.draw(ventana)
 
     # Botón de volver al menú
