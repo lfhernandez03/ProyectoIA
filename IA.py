@@ -447,8 +447,9 @@ def reiniciar_laberinto():
 import random
 
 def jugar(laberinto, camino_rene, camino_piggy, posicion_rene, posicion_piggy, posicion_elmo):
+    global en_seleccion_mapa
     encontro_piggy = False  # Variable local para determinar si Piggy encontró a René
-
+    
     # Inicializar índices para iterar por los caminos
     indice_rene = 0
     indice_piggy = 0
@@ -471,6 +472,7 @@ def jugar(laberinto, camino_rene, camino_piggy, posicion_rene, posicion_piggy, p
         # Verificar si Piggy encontró a René
         if posicion_piggy == posicion_rene:
             encontro_piggy = True  # Actualizar la variable local
+            en_seleccion_mapa = True  # Permitir selección de mapa tras interacción con Piggy
             break
 
         # Verificar si René encontró a Piggy o a Elmo para finalizar el juego
@@ -497,6 +499,7 @@ def jugar(laberinto, camino_rene, camino_piggy, posicion_rene, posicion_piggy, p
     elif encontro_piggy:
         mostrar_mensaje_interaccion_piggy()
         print("¡Piggy ha alcanzado a René, el juego ha terminado!")
+        en_seleccion_mapa = True  # Permitir selección de mapa tras interacción con Piggy
 
 # Interfaz gráfica
 boton_jugar = Button(200, 100, "Jugar")
