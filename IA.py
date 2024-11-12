@@ -1,5 +1,7 @@
 import pygame
 import sys
+import heapq
+import random
 from collections import deque
 from boton import Button
 
@@ -226,6 +228,56 @@ def bfs_piggy(laberinto, posicion_piggy, posicion_rene):
 
     return None  # Si no se encuentra un camino
 
+
+def heuristica(p1, p2):
+    """ Calcula la distancia Manhattan entre dos puntos. """
+    return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
+
+def a_estrella(laberinto, inicio, objetivo):
+    """ Implementación del algoritmo A* con impresiones del camino explorado. """
+    filas = len(laberinto)
+    columnas = len(laberinto[0])
+    abiertos = []
+    heapq.heappush(abiertos, (0, inicio))
+    came_from = {inicio: None}
+    costo_acumulado = {inicio: 0}
+
+    print("Iniciando búsqueda A* desde:", inicio)
+
+    while abiertos:
+        _, actual = heapq.heappop(abiertos)
+
+        print(f"Explorando nodo {actual}")
+
+        if actual == objetivo:
+            # Reconstruir y mostrar el camino encontrado
+            camino = []
+            while actual:
+                camino.append(actual)
+                actual = came_from[actual]
+            camino.reverse()
+            
+            # Mostrar camino final en pantalla
+            print("Camino encontrado hacia el objetivo:", camino)
+            return camino  # Retorna el camino encontrado
+
+        # Generar vecinos
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:  # Movimiento arriba, abajo, izquierda, derecha
+            vecino = (actual[0] + dx, actual[1] + dy)
+            if 0 <= vecino[0] < filas and 0 <= vecino[1] < columnas and laberinto[vecino[0]][vecino[1]] != '#':
+                nuevo_costo = costo_acumulado[actual] + 1
+                if vecino not in costo_acumulado or nuevo_costo < costo_acumulado[vecino]:
+                    costo_acumulado[vecino] = nuevo_costo
+                    prioridad = nuevo_costo + heuristica(vecino, objetivo)
+                    heapq.heappush(abiertos, (prioridad, vecino))
+                    came_from[vecino] = actual
+
+                    # Mostrar en pantalla el nodo añadido a la lista abierta
+                    print(f"Añadiendo {vecino} con prioridad {prioridad} a la lista de abiertos.")
+
+    print("No se encontró un camino al objetivo.")
+    return None  # Retorna None si no hay camino
+
 def actualizar_camino_piggy(laberinto, posicion_piggy, posicion_rene):
     camino_actual = bfs_piggy(laberinto, posicion_piggy, posicion_rene)
     return camino_actual
@@ -242,73 +294,122 @@ def podar_arbol(arbol, camino_valido):
 comio_galleta = False
 encontro_piggy = False
 
-def mover_personaje(laberinto, camino, personaje):
-    global comio_galleta, encontro_piggy, posicion_rene, posicion_piggy, posicion_elmo, en_seleccion_mapa
+def mover_personaje(laberinto, camino, personaje, camino_piggy=None, posicion_rene=None, posicion_piggy=None):
+    global comio_galleta, encontro_piggy, en_seleccion_mapa
+    
+    if personaje == 'P' and camino_piggy is not None:
+        # Generar un número aleatorio entre 1 y 10 para decidir si usar A* o BFS
+        cambio_algoritmo = random.randint(1, 10)
 
-    for paso in camino:
-        # Comprobar que el paso sea una tupla de longitud 2
-        if not isinstance(paso, tuple) or len(paso) != 2:
-            print(f"Error: paso tiene un formato incorrecto: {paso}")
-            continue  # Saltar este paso si no es válido
+        # Si el número es menor a 4 (40% de probabilidad), usar A*
+        if cambio_algoritmo <= 4:
+            print(f"Turno: {cambio_algoritmo}. Usando A* para mover a Piggy.")
+            camino_piggy = a_estrella(laberinto, posicion_piggy, posicion_rene)
+        else:
+            print(f"Turno: {cambio_algoritmo}. Usando BFS para mover a Piggy.")
+            camino_piggy = bfs_piggy(laberinto, posicion_piggy, posicion_rene)
 
-        fila, columna = paso
+        # Usamos el nuevo camino calculado para mover a Piggy
+        if camino_piggy:
+            # Solo moveremos a Piggy si hay un camino válido
+            paso_piggy = camino_piggy[0]
+            fila, columna = paso_piggy
 
-        # Limpiar la posición anterior del personaje en el laberinto
-        for fila_laberinto in range(len(laberinto)):
-            for columna_laberinto in range(len(laberinto[0])):
-                if personaje == 'R' and laberinto[fila_laberinto][columna_laberinto] == 'R':
-                    laberinto[fila_laberinto][columna_laberinto] = ' '  # Limpiar posición anterior de René
-                elif personaje == 'P' and laberinto[fila_laberinto][columna_laberinto] == 'P':
-                    laberinto[fila_laberinto][columna_laberinto] = ' '  # Limpiar posición anterior de Piggy
+            # Limpiar la posición anterior de Piggy en el laberinto
+            for fila_laberinto in range(len(laberinto)):
+                for columna_laberinto in range(len(laberinto[0])):
+                    if laberinto[fila_laberinto][columna_laberinto] == 'P':
+                        laberinto[fila_laberinto][columna_laberinto] = ' '
 
-        # Actualizar la posición del personaje en el laberinto
-        laberinto[fila][columna] = personaje
-
-        # Actualizar la posición global
-        if personaje == 'R':
-            posicion_rene = (fila, columna)
-        elif personaje == 'P':
+            # Actualizar la posición de Piggy en el laberinto
+            laberinto[fila][columna] = 'P'
             posicion_piggy = (fila, columna)
 
-        # Dibujar el estado actual del laberinto
-        dibujar_laberinto(ventana, laberinto)
-
-        # Mostrar la imagen correspondiente
-        if personaje == 'R':
-            if comio_galleta:
-                ventana.blit(imagen_rana_galleta, (columna * TAMANO_CELDA, fila * TAMANO_CELDA))
-            else:
-                ventana.blit(imagen_rene, (columna * TAMANO_CELDA, fila * TAMANO_CELDA))
-        elif personaje == 'P':
+            # Dibujar el laberinto actualizado
+            dibujar_laberinto(ventana, laberinto)
             ventana.blit(imagen_piggy, (columna * TAMANO_CELDA, fila * TAMANO_CELDA))
+            pygame.display.flip()
+            pygame.time.delay(500)
 
-        pygame.display.flip()
-        pygame.time.delay(500)
-
-        # Verificar interacciones específicas de René
-        if personaje == 'R':
-            # Verificar si René encontró la galleta
-            if (fila, columna) == tuple(posicion_galleta):
-                comio_galleta = True
-                ventana.blit(imagen_rana_galleta, (columna * TAMANO_CELDA, fila * TAMANO_CELDA))
-                pygame.display.flip()
-                pygame.time.delay(500)
-                comio_galleta = False  # Restablecer la variable después de mostrar la imagen
-
-            # Verificar si René encontró a Piggy
-            if (fila, columna) == posicion_piggy:
+            # Verificar interacciones específicas de Piggy
+            if (fila, columna) == posicion_rene:
                 encontro_piggy = True
                 ventana.blit(imagen_rana_elmo, (columna * TAMANO_CELDA, fila * TAMANO_CELDA))
                 pygame.display.flip()
                 mostrar_mensaje_interaccion_piggy()
-                en_seleccion_mapa = True  # Permitir selección de mapa tras interacción con Piggy
-                break
+                en_seleccion_mapa = True
+                return posicion_piggy, camino_piggy  # Terminamos si Piggy encuentra a René
 
-        # Redibujar la imagen original si le queda camino
-        if personaje == 'R' and not comio_galleta:
+            return posicion_piggy, camino_piggy
+
+    else:
+        # Si es René, seguimos la lógica original de movimiento
+        for paso in camino:
+            # Comprobar que el paso sea una tupla de longitud 2
+            if not isinstance(paso, tuple) or len(paso) != 2:
+                print(f"Error: paso tiene un formato incorrecto: {paso}")
+                continue  # Saltar este paso si no es válido
+
+            fila, columna = paso
+
+            # Limpiar la posición anterior del personaje en el laberinto
+            for fila_laberinto in range(len(laberinto)):
+                for columna_laberinto in range(len(laberinto[0])):
+                    if personaje == 'R' and laberinto[fila_laberinto][columna_laberinto] == 'R':
+                        laberinto[fila_laberinto][columna_laberinto] = ' '  # Limpiar posición anterior de René
+                    elif personaje == 'P' and laberinto[fila_laberinto][columna_laberinto] == 'P':
+                        laberinto[fila_laberinto][columna_laberinto] = ' '  # Limpiar posición anterior de Piggy
+
+            # Actualizar la posición del personaje en el laberinto
+            laberinto[fila][columna] = personaje
+
+            # Actualizar la posición global
+            if personaje == 'R':
+                posicion_rene = (fila, columna)
+            elif personaje == 'P':
+                posicion_piggy = (fila, columna)
+
+            # Dibujar el estado actual del laberinto
             dibujar_laberinto(ventana, laberinto)
-            ventana.blit(imagen_rene, (columna * TAMANO_CELDA, fila * TAMANO_CELDA))
+
+            # Mostrar la imagen correspondiente
+            if personaje == 'R':
+                if comio_galleta:
+                    ventana.blit(imagen_rana_galleta, (columna * TAMANO_CELDA, fila * TAMANO_CELDA))
+                else:
+                    ventana.blit(imagen_rene, (columna * TAMANO_CELDA, fila * TAMANO_CELDA))
+            elif personaje == 'P':
+                ventana.blit(imagen_piggy, (columna * TAMANO_CELDA, fila * TAMANO_CELDA))
+
             pygame.display.flip()
+            pygame.time.delay(500)
+
+            # Verificar interacciones específicas de René
+            if personaje == 'R':
+                # Verificar si René encontró la galleta
+                if (fila, columna) == tuple(posicion_galleta):
+                    comio_galleta = True
+                    ventana.blit(imagen_rana_galleta, (columna * TAMANO_CELDA, fila * TAMANO_CELDA))
+                    pygame.display.flip()
+                    pygame.time.delay(500)
+                    comio_galleta = False  # Restablecer la variable después de mostrar la imagen
+
+                # Verificar si René encontró a Piggy
+                if (fila, columna) == posicion_piggy:
+                    encontro_piggy = True
+                    ventana.blit(imagen_rana_elmo, (columna * TAMANO_CELDA, fila * TAMANO_CELDA))
+                    pygame.display.flip()
+                    mostrar_mensaje_interaccion_piggy()
+                    en_seleccion_mapa = True  # Permitir selección de mapa tras interacción con Piggy
+                    break
+
+            # Redibujar la imagen original si le queda camino
+            if personaje == 'R' and not comio_galleta:
+                dibujar_laberinto(ventana, laberinto)
+                ventana.blit(imagen_rene, (columna * TAMANO_CELDA, fila * TAMANO_CELDA))
+                pygame.display.flip()
+
+    return posicion_rene, camino  # Retorna la nueva posición de René o Piggy y el camino
 
 # Función para mostrar mensaje de interacción con Piggy
 def mostrar_mensaje_interaccion_piggy():
@@ -343,6 +444,8 @@ def reiniciar_laberinto():
     posicion_galleta = posiciones["galleta"]
     
 # Función principal del juego
+import random
+
 def jugar(laberinto, camino_rene, camino_piggy, posicion_rene, posicion_piggy, posicion_elmo):
     encontro_piggy = False  # Variable local para determinar si Piggy encontró a René
 
@@ -356,13 +459,13 @@ def jugar(laberinto, camino_rene, camino_piggy, posicion_rene, posicion_piggy, p
         # Mover a René si aún tiene pasos en su camino
         if indice_rene < len(camino_rene):
             posicion_rene = camino_rene[indice_rene]  # Actualiza la posición de René
-            mover_personaje(laberinto, [posicion_rene], 'R')
+            mover_personaje(laberinto, [posicion_rene], 'R', camino_piggy, posicion_rene, posicion_piggy)
             indice_rene += 1
 
         # Mover a Piggy si aún tiene pasos en su camino
         if indice_piggy < len(camino_piggy):
             posicion_piggy = camino_piggy[indice_piggy]  # Actualiza la posición de Piggy
-            mover_personaje(laberinto, [posicion_piggy], 'P')
+            mover_personaje(laberinto, [posicion_piggy], 'P', camino_piggy, posicion_rene, posicion_piggy)
             indice_piggy += 1
 
         # Verificar si Piggy encontró a René
@@ -374,9 +477,18 @@ def jugar(laberinto, camino_rene, camino_piggy, posicion_rene, posicion_piggy, p
         if posicion_rene == posicion_elmo or encontro_piggy:
             break
 
-        # Actualiza el camino de Piggy después de cada movimiento
+        # Actualiza el camino de Piggy después de cada movimiento, con cambio de algoritmo
         if indice_piggy < len(camino_piggy):
-            camino_piggy = actualizar_camino_piggy(laberinto, posicion_piggy, posicion_rene)
+            # Generar un número aleatorio entre 1 y 10 para decidir si usar A* o BFS
+            cambio_algoritmo = random.randint(1, 10)
+
+            # Si el número es menor a 4 (40% de probabilidad), usar A*
+            if cambio_algoritmo <= 4:
+                print(f"Turno: {cambio_algoritmo}. Usando A* para mover a Piggy.")
+                camino_piggy = a_estrella(laberinto, posicion_piggy, posicion_rene)
+            else:
+                print(f"Turno: {cambio_algoritmo}. Usando BFS para mover a Piggy.")
+                camino_piggy = bfs_piggy(laberinto, posicion_piggy, posicion_rene)
 
     # Mostrar mensaje de fin del juego
     if posicion_rene == posicion_elmo:
@@ -477,7 +589,7 @@ def manejar_eventos(events):
                     profundidad_maxima = 20
                     # Calcula los caminos para René y Piggy
                     camino_rene = busqueda_profundidad_limitada(laberinto, posicion_rene, posicion_elmo, profundidad_maxima)
-                    camino_piggy = bfs_piggy(laberinto, posicion_piggy, posicion_rene)
+                    camino_piggy = a_estrella(laberinto, posicion_piggy, posicion_rene)
                     # Llama a jugar con los parámetros correctos
                     jugar(laberinto, camino_rene, camino_piggy, posicion_rene, posicion_piggy, posicion_elmo)
             # Crear y actualizar el botón de "Volver al menú"
